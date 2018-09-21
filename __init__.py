@@ -22,10 +22,13 @@ arduino_data = serial.Serial()
 
 def frameChange(passedScene):
 	data = arduino_data.readline().strip()
-	rot_angle = float(data.decode())
-	print(rot_angle)
 
-	bpy.context.active_object.rotation_euler = (radians(rot_angle), 0.0, 0.0)
+	# rot_angle = float(data.decode())
+	data = str(data.decode())
+	data_YPR = [float(val) for val in data.split(',')]
+	# print(data_split, type(data_split))
+
+	bpy.context.active_object.rotation_euler = (radians(data_YPR[0]), radians(data_YPR[1]), radians(data_YPR[2]))
 	#bpy.context.active_object.location.x = rot_angle
 
 
@@ -72,7 +75,7 @@ class Start_Capture(bpy.types.Operator):
 
 		arduino_prop.captured = True
 
-		arduino_data.baudrate = 9600
+		arduino_data.baudrate = 115200 #9600
 		arduino_data.port = arduino_prop.COM_ports
 
 		arduino_data.open()
