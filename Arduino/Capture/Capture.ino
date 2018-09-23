@@ -140,7 +140,7 @@ float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 // packet structure for InvenSense teapot demo
-uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
+//uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
 
 
@@ -153,7 +153,7 @@ void dmpDataReady() {
     mpuInterrupt = true;
 }
 
-
+unsigned int last_millis = millis();
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -181,22 +181,22 @@ void setup() {
     // crystal solution for the UART timer.
 
     // initialize device
-    Serial.println(F("Initializing I2C devices..."));
+    //Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
 
     // verify connection
-    Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+    //Serial.println(F("Testing device connections..."));
+    //Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // wait for ready
-    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
-    while (Serial.available() && Serial.read()); // empty buffer
-    while (!Serial.available());                 // wait for data
-    while (Serial.available() && Serial.read()); // empty buffer again
+    //Serial.println(F("\nSend any character to begin DMP programming and demo: "));
+    //while (Serial.available() && Serial.read()); // empty buffer
+    //while (!Serial.available());                 // wait for data
+    //while (Serial.available() && Serial.read()); // empty buffer again
 
     // load and configure the DMP
-    Serial.println(F("Initializing DMP..."));
+    //Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
@@ -227,9 +227,9 @@ void setup() {
         // 1 = initial memory load failed
         // 2 = DMP configuration updates failed
         // (if it's going to break, usually the code will be 1)
-        Serial.print(F("DMP Initialization failed (code "));
-        Serial.print(devStatus);
-        Serial.println(F(")"));
+        //Serial.print(F("DMP Initialization failed (code "));
+        //Serial.print(devStatus);
+        //Serial.println(F(")"));
     }
 
     // configure LED for output
@@ -237,7 +237,7 @@ void setup() {
 }
 
 
-unsigned int last_millis;
+
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
@@ -245,7 +245,7 @@ unsigned int last_millis;
 void loop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
-    
+
     if ( millis() - last_millis >= 30) {
   
       // wait for MPU interrupt or extra packet(s) available
@@ -268,7 +268,7 @@ void loop() {
       if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
           // reset so we can continue cleanly
           mpu.resetFIFO();
-          Serial.println(F("FIFO overflow!"));
+          //Serial.println(F("FIFO overflow!"));
   
       // otherwise, check for DMP data ready interrupt (this should happen frequently)
       } else if (mpuIntStatus & 0x02) {
@@ -299,7 +299,7 @@ void loop() {
           blinkState = !blinkState;
           digitalWrite(LED_PIN, blinkState);
       }
-      
+      last_millis = millis();
     }
-    last_millis = millis();
+    
 }
