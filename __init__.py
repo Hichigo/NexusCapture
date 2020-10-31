@@ -10,9 +10,13 @@ bl_info = {
 	"category": "User"
 	}
 
+import re
 import sys
 import glob
+import time
 import serial
+import threading
+
 import bpy
 from bpy.props import *
 import bpy.utils.previews
