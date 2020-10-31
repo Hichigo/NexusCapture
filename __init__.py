@@ -16,11 +16,11 @@ import glob
 import time
 import serial
 import threading
+from math import acos, radians
 
 import bpy
 from bpy.props import EnumProperty, BoolProperty
-import bpy.utils.previews
-from math import radians
+# import bpy.utils.previews
 
 arduino = serial.Serial()
 
@@ -48,26 +48,31 @@ class RotateCubeThread(threading.Thread):
 
     def run(self):
         FPS = 1
-        # arduino_prop = bpy.context.scene.arduino_prop.captured
 
         tick = time.time()
         loop = 0
         x = 0
-        cube = bpy.data.objects["Cube"]
+        bpy.context.scene.capture_object.rotation_mode = 'XYZ'
 
         while bpy.context.scene.arduino_prop.captured is True:
             # ax, ay, az, gx, gy, gz
             transform = self.get_serial_data()
-            # cube.rotation_mode = 'XYZ'
-            # cube.rotation_euler = (transform[3]/2000, transform[4]/2000, transform[5] /2000)
-            print(transform)
+
+            # print(transform[0])
+
+            ay = transform[0] / 16384.0
+            ay = max(min(ay, 1.0), -1.0)
+
+            if ay >= 0:
+                angle_ax = 90 - 57.29577951308232087679815481410517033*acos(ay)
+            else:
+                angle_ax = 57.29577951308232087679815481410517033*acos(-ay) - 90
 
             if not transform:
                 print("buffer")
             else:
-                #knob.rotation_euler = ( rotation_degrees[0] * 0.00875, rotation_degrees[1] * 0.00875, rotation_degrees[2] * 0.00875)
-                # cube.location.y += 0
-                pass
+                print(angle_ax)
+                # bpy.context.scene.capture_object.rotation_euler.x = angle_ax
             tick = time.time()
 
             loop += 1
@@ -105,8 +110,8 @@ def serial_ports():
             pass
     return result
 
-class Start_Capture(bpy.types.Operator):
-
+class StartCapture(bpy.types.Operator):
+    """ Operator start capture """
     bl_idname = "capture.start"
     bl_label = "Capture Start"
 
@@ -116,7 +121,7 @@ class Start_Capture(bpy.types.Operator):
 
         arduino_prop.captured = True
 
-        arduino.baudrate = 9600 #115200
+        arduino.baudrate = 115200#9600
         arduino.port = arduino_prop.COM_ports
 
         arduino.open()
@@ -128,8 +133,8 @@ class Start_Capture(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class Stop_Capture(bpy.types.Operator):
-
+class StopCapture(bpy.types.Operator):
+    """ Operator stop capture """
     bl_idname = "capture.stop"
     bl_label = "Capture Stop"
 
@@ -163,6 +168,8 @@ class CapturePanel(bpy.types.Panel):
         col = layout.column()
         col.label(text="COM ports")
         col.prop(arduino_prop, "COM_ports", text="")
+        # col.prop_search(scene, text="", scene, "objects")
+        col.prop(context.scene, "capture_object", text="")
 
         col = layout.column()
 
@@ -187,9 +194,9 @@ class ArduinoCaptureProp(bpy.types.PropertyGroup):
 
 classes = (
     ArduinoCaptureProp,
-    Start_Capture,
-    Stop_Capture,
-    CapturePanel
+    StartCapture,
+    StopCapture,
+    CapturePanel,
 )
 
 
@@ -199,6 +206,10 @@ def register():
         register_class(cls)
 
     bpy.types.Scene.arduino_prop = bpy.props.PointerProperty(type=ArduinoCaptureProp)
+    bpy.types.Scene.capture_object = bpy.props.PointerProperty(
+        type=bpy.types.Object,
+        # poll=scene_mychosenobject_poll
+    )
 
 def unregister():
     from bpy.utils import unregister_class
@@ -206,6 +217,7 @@ def unregister():
         unregister_class(cls)
 
     del bpy.types.Scene.arduino_prop
+    del bpy.types.Scene.capture_object
 
 if __name__ == '__main__':
     register()
