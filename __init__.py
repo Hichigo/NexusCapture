@@ -16,7 +16,7 @@ import glob
 import time
 import serial
 import threading
-from math import acos, radians
+from math import *
 from mathutils import Vector, Matrix
 
 import bpy
@@ -30,6 +30,10 @@ class RotateCubeThread(threading.Thread):
         threading.Thread.__init__(self)
         self.threadID = threadID
         self.name = name
+
+        self.old_rx = 0
+        self.old_ry = 0
+        self.old_rz = 0
 
     def get_serial_data(self):
         data = arduino.readline()[:-2] #the last bit gets rid of the new-line chars
@@ -54,7 +58,10 @@ class RotateCubeThread(threading.Thread):
         else:
             angle = 57.29577951308232087679815481410517033*acos(-ay) - 90
 
-        return radians(angle)# * 3.1415 / 180
+        rad_angle = radians(angle)
+        if abs(rad_angle) < 0.1:
+            rad_angle = 0
+        return rad_angle
 
     def to_location(self, val):
         pass
@@ -62,6 +69,10 @@ class RotateCubeThread(threading.Thread):
 
     def run(self):
         bpy.context.scene.capture_object.rotation_mode = 'XYZ'
+        transform = self.get_serial_data()
+        self.old_rx = self.to_rad(transform[3])
+        self.old_ry = self.to_rad(transform[4])
+        self.old_rz = self.to_rad(transform[5])
 
         while bpy.context.scene.arduino_prop.captured is True:
             time.sleep(.1)
@@ -69,16 +80,23 @@ class RotateCubeThread(threading.Thread):
             # попробовать вычислять разницу между углом объекта и этими данными (gx, gy, gz)
             transform = self.get_serial_data()
 
-            angle_ax = self.to_rad(transform[0])
-            angle_ay = self.to_rad(transform[1])
-            angle_az = self.to_rad(transform[2])
+            current_rx = self.to_rad(transform[3])
+            current_ry = self.to_rad(transform[4])
+            current_rz = self.to_rad(transform[5])
 
-            # x = self.to_rad(transform[3])
+            delta_rx = current_rx - self.old_rx
+            delta_ry = current_ry - self.old_ry
+            delta_rz = current_rz - self.old_rz
+            print(delta_rx, delta_ry, delta_rz)
 
+            # self.old_rx = current_rx
+            # self.old_ry = current_ry
+            # self.old_rz = current_rz
+            # # x = self.to_rad(transform[3])
+            # continue
             if not transform:
                 print("buffer")
-            else:
-                print(transform[2])
+            elif delta_rx != 0 or delta_ry != 0 or delta_rz != 0:
                 cube = bpy.context.scene.capture_object
                 loc, rot, scale = cube.matrix_world.decompose()
 
@@ -89,21 +107,22 @@ class RotateCubeThread(threading.Thread):
                 scale_mat[1][1] = scale.y
                 scale_mat[2][2] = scale.z
 
-                normal_hit = Vector((angle_ax, angle_ay, angle_az)).normalized()
+                rot_euler = rot.to_euler()
+                arduino_rot = Vector((rot_euler.x + delta_rx, rot_euler.y + delta_ry, rot_euler.z + delta_rz)).normalized()
 
+                delta_rot_arduino = arduino_rot.rotation_difference(Vector((0,0,1)))
+                delta_rot_arduino.invert()
+                delta_rot_arduino = delta_rot_arduino.to_euler().to_matrix().to_4x4()
 
-                rot_by_normal = normal_hit.rotation_difference(Vector((0,0,1)))
-                rot_by_normal.invert()
-                rot_by_normal = rot_by_normal.to_euler().to_matrix().to_4x4()
-
-                rot = rot_by_normal
+                rot = delta_rot_arduino
 
                 mat_w = loc @ rot @ scale_mat
 
                 cube.matrix_world = mat_w
-                # bpy.context.scene.capture_object.rotation_euler = Vector((angle_ax, angle_ay, angle_az))
 
-                # bpy.context.scene.capture_object.location.x += x
+                self.old_rx = current_rx
+                self.old_ry = current_ry
+                self.old_rz = current_rz
 
 def enum_COMports_list(self, context):
     ports = serial_ports()
