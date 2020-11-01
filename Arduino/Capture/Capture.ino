@@ -1,7 +1,7 @@
 #include "I2Cdev.h"
 #include "MPU6050.h"
 
-#define T_OUT 20
+#define T_OUT 100
 
 MPU6050 accel;
 
