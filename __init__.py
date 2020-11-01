@@ -17,10 +17,11 @@ import time
 import serial
 import threading
 from math import acos, radians
+from mathutils import Vector, Matrix
 
 import bpy
 from bpy.props import EnumProperty, BoolProperty
-# import bpy.utils.previews
+
 
 arduino = serial.Serial()
 
@@ -34,11 +35,9 @@ class RotateCubeThread(threading.Thread):
         data = arduino.readline()[:-2] #the last bit gets rid of the new-line chars
         if data == b'0' or data == b'':
             data = b"0|0|0|0|0|0"
-        try:
+        else:
             data = data.decode("utf-8").split("|")
 
-        except:
-            print("Value error!!!")
         if data:
             result = []
             for item in data:
@@ -46,37 +45,65 @@ class RotateCubeThread(threading.Thread):
 
         return result
 
-    def run(self):
-        FPS = 1
+    def to_rad(self, val):
+        ay = val / 16384.0
+        ay = max(min(ay, 1.0), -1.0)
 
-        tick = time.time()
-        loop = 0
-        x = 0
+        if ay >= 0:
+            angle = 90 - 57.29577951308232087679815481410517033*acos(ay)
+        else:
+            angle = 57.29577951308232087679815481410517033*acos(-ay) - 90
+
+        return radians(angle)# * 3.1415 / 180
+
+    def to_location(self, val):
+        pass
+
+
+    def run(self):
         bpy.context.scene.capture_object.rotation_mode = 'XYZ'
 
         while bpy.context.scene.arduino_prop.captured is True:
+            time.sleep(.1)
             # ax, ay, az, gx, gy, gz
+            # попробовать вычислять разницу между углом объекта и этими данными (gx, gy, gz)
             transform = self.get_serial_data()
 
-            # print(transform[0])
+            angle_ax = self.to_rad(transform[0])
+            angle_ay = self.to_rad(transform[1])
+            angle_az = self.to_rad(transform[2])
 
-            ay = transform[0] / 16384.0
-            ay = max(min(ay, 1.0), -1.0)
-
-            if ay >= 0:
-                angle_ax = 90 - 57.29577951308232087679815481410517033*acos(ay)
-            else:
-                angle_ax = 57.29577951308232087679815481410517033*acos(-ay) - 90
+            # x = self.to_rad(transform[3])
 
             if not transform:
                 print("buffer")
             else:
-                print(angle_ax)
-                # bpy.context.scene.capture_object.rotation_euler.x = angle_ax
-            tick = time.time()
+                print(transform[2])
+                cube = bpy.context.scene.capture_object
+                loc, rot, scale = cube.matrix_world.decompose()
 
-            loop += 1
-            x += 1
+                loc = Matrix.Translation(cube.location)
+
+                scale_mat = Matrix.Scale(1, 4)
+                scale_mat[0][0] = scale.x
+                scale_mat[1][1] = scale.y
+                scale_mat[2][2] = scale.z
+
+                normal_hit = Vector((angle_ax, angle_ay, angle_az)).normalized()
+
+
+                rot_by_normal = normal_hit.rotation_difference(Vector((0,0,1)))
+                rot_by_normal.invert()
+                rot_by_normal = rot_by_normal.to_euler().to_matrix().to_4x4()
+
+                rot = rot_by_normal
+
+                mat_w = loc @ rot @ scale_mat
+
+                cube.matrix_world = mat_w
+                # bpy.context.scene.capture_object.rotation_euler = Vector((angle_ax, angle_ay, angle_az))
+
+                # bpy.context.scene.capture_object.location.x += x
 
 def enum_COMports_list(self, context):
     ports = serial_ports()
@@ -168,7 +195,6 @@ class CapturePanel(bpy.types.Panel):
         col = layout.column()
         col.label(text="COM ports")
         col.prop(arduino_prop, "COM_ports", text="")
-        # col.prop_search(scene, text="", scene, "objects")
         col.prop(context.scene, "capture_object", text="")
 
         col = layout.column()
@@ -179,8 +205,6 @@ class CapturePanel(bpy.types.Panel):
         row = col.row(align=True)
         row.enabled = arduino_prop.captured
         row.operator("capture.stop", icon="CANCEL", text="Stop capture")
-
-
 
 class ArduinoCaptureProp(bpy.types.PropertyGroup):
     COM_ports: EnumProperty(
@@ -198,7 +222,6 @@ classes = (
     StopCapture,
     CapturePanel,
 )
-
 
 def register():
     from bpy.utils import register_class
